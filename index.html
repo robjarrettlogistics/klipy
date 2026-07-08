@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>GIF Picker</title>
-<script src="https://dl.frontapp.com/libs/frontjs.min.js"></script>
+<script type="text/javascript" src="//dl.frontapp.com/libs/plugin-sdk-1.0.1.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #222; }
@@ -20,15 +20,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .gif-item { border-radius: 6px; overflow: hidden; background: #f0f0f0; aspect-ratio: 1; cursor: pointer; position: relative; }
 .gif-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .gif-item:hover::after { content: 'Insert'; position: absolute; inset: 0; background: rgba(0,0,0,0.45); color: #fff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
-.gif-item:hover::after { display: flex; }
 .status { font-size: 12px; color: #999; text-align: center; padding: 20px 0; }
-.toast { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; font-size: 12px; padding: 6px 14px; border-radius: 6px; display: none; }
+.context-status { font-size: 11px; padding: 4px 8px; border-radius: 4px; margin-bottom: 8px; text-align: center; }
+.context-status.ready { background: #e6f4ea; color: #1e8e3e; }
+.context-status.waiting { background: #fef3e2; color: #b06000; }
+.toast { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; font-size: 12px; padding: 6px 14px; border-radius: 6px; display: none; z-index: 99; }
 .load-more { display: block; width: 100%; margin-top: 10px; padding: 7px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 12px; color: #444; }
 .attribution { font-size: 10px; color: #bbb; text-align: right; margin-top: 8px; }
 </style>
 </head>
 <body>
 <div id="app">
+  <div id="contextStatus" class="context-status waiting">Waiting for Front context...</div>
   <div class="tab-row">
     <button class="tab active" data-tab="gifs">GIFs</button>
     <button class="tab" data-tab="stickers">Stickers</button>
@@ -52,10 +55,19 @@ let currentTab = 'gifs';
 let currentPage = 1;
 let currentQuery = '';
 let isTrending = false;
+let frontContext = null;
 
-document.querySelectorAll('.tab').forEach(t => {
-  t.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+// Subscribe to Front context updates
+Front.contextUpdates.subscribe(function(context) {
+  frontContext = context;
+  var el = document.getElementById('contextStatus');
+  el.textContent = 'Front connected — click a GIF to insert';
+  el.className = 'context-status ready';
+});
+
+document.querySelectorAll('.tab').forEach(function(t) {
+  t.addEventListener('click', function() {
+    document.querySelectorAll('.tab').forEach(function(x) { x.classList.remove('active'); });
     t.classList.add('active');
     currentTab = t.dataset.tab;
     currentPage = 1;
@@ -65,14 +77,14 @@ document.querySelectorAll('.tab').forEach(t => {
   });
 });
 
-document.getElementById('query').addEventListener('keydown', e => {
+document.getElementById('query').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') doSearch();
 });
 
 async function fetchItems(url) {
   setStatus('Loading...');
   try {
-    const res = await fetch(url);
+    var res = await fetch(url);
     if (!res.ok) { setStatus('API error ' + res.status + '.'); return null; }
     return await res.json();
   } catch(e) {
@@ -82,13 +94,13 @@ async function fetchItems(url) {
 }
 
 async function doSearch(silent) {
-  const q = silent ? currentQuery : document.getElementById('query').value.trim();
+  var q = silent ? currentQuery : document.getElementById('query').value.trim();
   if (!q) { setStatus('Enter a search term.'); return; }
   currentQuery = q;
   isTrending = false;
   currentPage = 1;
   document.getElementById('grid').innerHTML = '';
-  const data = await fetchItems('https://api.klipy.com/api/v1/' + API_KEY + '/' + currentTab + '/search?q=' + encodeURIComponent(q) + '&per_page=24&page=1');
+  var data = await fetchItems('https://api.klipy.com/api/v1/' + API_KEY + '/' + currentTab + '/search?q=' + encodeURIComponent(q) + '&per_page=24&page=1');
   if (data) renderItems(data, true);
 }
 
@@ -97,43 +109,46 @@ async function doTrending() {
   currentQuery = '';
   currentPage = 1;
   document.getElementById('grid').innerHTML = '';
-  const data = await fetchItems('https://api.klipy.com/api/v1/' + API_KEY + '/' + currentTab + '/trending?per_page=24&page=1');
+  var data = await fetchItems('https://api.klipy.com/api/v1/' + API_KEY + '/' + currentTab + '/trending?per_page=24&page=1');
   if (data) renderItems(data, true);
 }
 
 async function loadMore() {
   currentPage++;
-  const url = isTrending
+  var url = isTrending
     ? 'https://api.klipy.com/api/v1/' + API_KEY + '/' + currentTab + '/trending?per_page=24&page=' + currentPage
     : 'https://api.klipy.com/api/v1/' + API_KEY + '/' + currentTab + '/search?q=' + encodeURIComponent(currentQuery) + '&per_page=24&page=' + currentPage;
-  const data = await fetchItems(url);
+  var data = await fetchItems(url);
   if (data) renderItems(data, false);
 }
 
 function insertGif(url, title) {
-  const html = '<img src="' + url + '" alt="' + (title || 'GIF') + '" style="max-width:100%;" />';
-  if (typeof Front !== 'undefined') {
+  var html = '<img src="' + url + '" alt="' + (title || 'GIF') + '" style="max-width:100%;" />';
+  if (frontContext && typeof frontContext.insertHTML === 'function') {
+    frontContext.insertHTML(html);
+    showToast('Inserted!');
+  } else if (typeof Front !== 'undefined' && typeof Front.insertHTML === 'function') {
     Front.insertHTML(html);
     showToast('Inserted!');
   } else {
-    showToast('Front SDK not available — open this in Front.');
+    showToast('Open a reply or comment first');
   }
 }
 
 function renderItems(data, replace) {
-  const grid = document.getElementById('grid');
-  const items = (data && data.data && data.data.data) ? data.data.data : [];
+  var grid = document.getElementById('grid');
+  var items = (data && data.data && data.data.data) ? data.data.data : [];
   if (replace) grid.innerHTML = '';
   if (items.length === 0) { setStatus('No results found.'); document.getElementById('loadMore').style.display = 'none'; return; }
   setStatus('');
   items.forEach(function(item) {
-    const file = item.file || {};
-    const thumb = (file.sm && file.sm.gif && file.sm.gif.url) || (file.xs && file.xs.gif && file.xs.gif.url) || (file.md && file.md.gif && file.md.gif.url) || '';
-    const full  = (file.md && file.md.gif && file.md.gif.url) || (file.hd && file.hd.gif && file.hd.gif.url) || thumb;
+    var file = item.file || {};
+    var thumb = (file.sm && file.sm.gif && file.sm.gif.url) || (file.xs && file.xs.gif && file.xs.gif.url) || (file.md && file.md.gif && file.md.gif.url) || '';
+    var full  = (file.md && file.md.gif && file.md.gif.url) || (file.hd && file.hd.gif && file.hd.gif.url) || thumb;
     if (!thumb) return;
-    const div = document.createElement('div');
+    var div = document.createElement('div');
     div.className = 'gif-item';
-    const img = document.createElement('img');
+    var img = document.createElement('img');
     img.src = thumb;
     img.alt = item.title || '';
     img.loading = 'lazy';
@@ -145,13 +160,13 @@ function renderItems(data, replace) {
 }
 
 function setStatus(msg) {
-  const s = document.getElementById('status');
+  var s = document.getElementById('status');
   s.textContent = msg;
   s.style.display = msg ? 'block' : 'none';
 }
 
 function showToast(msg) {
-  const t = document.getElementById('toast');
+  var t = document.getElementById('toast');
   t.textContent = msg;
   t.style.display = 'block';
   setTimeout(function() { t.style.display = 'none'; }, 1800);
