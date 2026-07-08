@@ -1,26 +1,34 @@
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GIF Picker</title>
+<script src="https://dl.frontapp.com/libs/frontjs.min.js"></script>
 <style>
-* { box-sizing: border-box; }
-#app { padding: 1rem 0; font-family: var(--font-sans); }
-.tab-row { display: flex; gap: 6px; margin-bottom: 1rem; }
-.tab { padding: 6px 14px; border-radius: var(--radius); border: 0.5px solid var(--border); background: transparent; cursor: pointer; font-size: 13px; color: var(--text-secondary); }
-.tab.active { background: var(--bg-accent); color: var(--text-accent); border-color: var(--border-accent); }
-.search-row { display: flex; gap: 8px; margin-bottom: 1rem; }
-.search-row input { flex: 1; }
-.gif-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; }
-.gif-item { position: relative; border-radius: var(--radius); overflow: hidden; background: var(--surface-1); aspect-ratio: 1; cursor: pointer; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #222; }
+#app { padding: 12px; }
+.tab-row { display: flex; gap: 5px; margin-bottom: 10px; }
+.tab { flex: 1; padding: 5px 0; border-radius: 6px; border: 1px solid #ddd; background: transparent; cursor: pointer; font-size: 12px; color: #666; }
+.tab.active { background: #e8f0fe; color: #1a73e8; border-color: #1a73e8; }
+.search-row { display: flex; gap: 6px; margin-bottom: 10px; }
+.search-row input { flex: 1; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+.search-row button { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 12px; color: #444; }
+.search-row button:hover { background: #f5f5f5; }
+.gif-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 5px; }
+.gif-item { border-radius: 6px; overflow: hidden; background: #f0f0f0; aspect-ratio: 1; cursor: pointer; position: relative; }
 .gif-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.gif-item .copied-badge { position: absolute; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.15s; pointer-events: none; }
-.gif-item .copied-badge span { color: #fff; font-size: 12px; font-weight: 500; background: rgba(0,0,0,0.6); padding: 4px 10px; border-radius: var(--radius); }
-.gif-item.copied .copied-badge { opacity: 1; }
-.status { font-size: 13px; color: var(--text-muted); text-align: center; padding: 2rem 0; }
-.hint { font-size: 12px; color: var(--text-muted); margin-bottom: 1rem; }
-.attribution { font-size: 11px; color: var(--text-muted); text-align: right; margin-top: 8px; }
-.load-more { display: block; width: 100%; margin-top: 12px; }
+.gif-item:hover::after { content: 'Insert'; position: absolute; inset: 0; background: rgba(0,0,0,0.45); color: #fff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.gif-item:hover::after { display: flex; }
+.status { font-size: 12px; color: #999; text-align: center; padding: 20px 0; }
+.toast { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; font-size: 12px; padding: 6px 14px; border-radius: 6px; display: none; }
+.load-more { display: block; width: 100%; margin-top: 10px; padding: 7px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 12px; color: #444; }
+.attribution { font-size: 10px; color: #bbb; text-align: right; margin-top: 8px; }
 </style>
-
+</head>
+<body>
 <div id="app">
-  <h2 class="sr-only">Klipy GIF search widget</h2>
   <div class="tab-row">
     <button class="tab active" data-tab="gifs">GIFs</button>
     <button class="tab" data-tab="stickers">Stickers</button>
@@ -31,12 +39,12 @@
     <button onclick="doSearch()">Search</button>
     <button onclick="doTrending()">Trending</button>
   </div>
-  <p class="hint">Click any GIF to copy it to your clipboard, then paste it into your editor.</p>
   <div id="grid" class="gif-grid"></div>
-  <div id="status" class="status"></div>
+  <div id="status" class="status">Loading trending...</div>
   <button id="loadMore" class="load-more" style="display:none" onclick="loadMore()">Load more</button>
   <div class="attribution">Powered by KLIPY</div>
 </div>
+<div id="toast" class="toast"></div>
 
 <script>
 const API_KEY = 'YXxLGyFs86hGcanamfKx7dFwR4WKuE2YrBQUNQGsqTmi36v4cKZR5BlHgjbo7TZz';
@@ -65,10 +73,10 @@ async function fetchItems(url) {
   setStatus('Loading...');
   try {
     const res = await fetch(url);
-    if (!res.ok) { setStatus(`API error ${res.status}.`); return null; }
+    if (!res.ok) { setStatus('API error ' + res.status + '.'); return null; }
     return await res.json();
   } catch(e) {
-    setStatus('Request failed. Check your network connection.');
+    setStatus('Request failed.');
     return null;
   }
 }
@@ -80,7 +88,7 @@ async function doSearch(silent) {
   isTrending = false;
   currentPage = 1;
   document.getElementById('grid').innerHTML = '';
-  const data = await fetchItems(`https://api.klipy.com/api/v1/${API_KEY}/${currentTab}/search?q=${encodeURIComponent(q)}&per_page=24&page=1`);
+  const data = await fetchItems('https://api.klipy.com/api/v1/' + API_KEY + '/' + currentTab + '/search?q=' + encodeURIComponent(q) + '&per_page=24&page=1');
   if (data) renderItems(data, true);
 }
 
@@ -89,58 +97,51 @@ async function doTrending() {
   currentQuery = '';
   currentPage = 1;
   document.getElementById('grid').innerHTML = '';
-  const data = await fetchItems(`https://api.klipy.com/api/v1/${API_KEY}/${currentTab}/trending?per_page=24&page=1`);
+  const data = await fetchItems('https://api.klipy.com/api/v1/' + API_KEY + '/' + currentTab + '/trending?per_page=24&page=1');
   if (data) renderItems(data, true);
 }
 
 async function loadMore() {
   currentPage++;
   const url = isTrending
-    ? `https://api.klipy.com/api/v1/${API_KEY}/${currentTab}/trending?per_page=24&page=${currentPage}`
-    : `https://api.klipy.com/api/v1/${API_KEY}/${currentTab}/search?q=${encodeURIComponent(currentQuery)}&per_page=24&page=${currentPage}`;
+    ? 'https://api.klipy.com/api/v1/' + API_KEY + '/' + currentTab + '/trending?per_page=24&page=' + currentPage
+    : 'https://api.klipy.com/api/v1/' + API_KEY + '/' + currentTab + '/search?q=' + encodeURIComponent(currentQuery) + '&per_page=24&page=' + currentPage;
   const data = await fetchItems(url);
   if (data) renderItems(data, false);
 }
 
-async function copyGif(div, url) {
-  try {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    await navigator.clipboard.write([
-      new ClipboardItem({ 'image/gif': blob })
-    ]);
-    div.classList.add('copied');
-    setTimeout(() => div.classList.remove('copied'), 1500);
-  } catch(e) {
-    // fallback: copy URL as text
-    try {
-      await navigator.clipboard.writeText(url);
-      div.classList.add('copied');
-      setTimeout(() => div.classList.remove('copied'), 1500);
-    } catch(_) {}
+function insertGif(url, title) {
+  const html = '<img src="' + url + '" alt="' + (title || 'GIF') + '" style="max-width:100%;" />';
+  if (typeof Front !== 'undefined') {
+    Front.insertHTML(html);
+    showToast('Inserted!');
+  } else {
+    showToast('Front SDK not available — open this in Front.');
   }
 }
 
 function renderItems(data, replace) {
   const grid = document.getElementById('grid');
-  const items = data?.data?.data || [];
+  const items = (data && data.data && data.data.data) ? data.data.data : [];
   if (replace) grid.innerHTML = '';
   if (items.length === 0) { setStatus('No results found.'); document.getElementById('loadMore').style.display = 'none'; return; }
   setStatus('');
-
-  items.forEach(item => {
+  items.forEach(function(item) {
     const file = item.file || {};
-    const thumb = file.sm?.gif?.url || file.xs?.gif?.url || file.md?.gif?.url || '';
-    const full  = file.md?.gif?.url || file.hd?.gif?.url || thumb;
+    const thumb = (file.sm && file.sm.gif && file.sm.gif.url) || (file.xs && file.xs.gif && file.xs.gif.url) || (file.md && file.md.gif && file.md.gif.url) || '';
+    const full  = (file.md && file.md.gif && file.md.gif.url) || (file.hd && file.hd.gif && file.hd.gif.url) || thumb;
     if (!thumb) return;
     const div = document.createElement('div');
     div.className = 'gif-item';
-    div.innerHTML = `<img src="${thumb}" alt="${item.title || ''}" loading="lazy"><div class="copied-badge"><span>Copied!</span></div>`;
-    div.addEventListener('click', () => copyGif(div, full));
+    const img = document.createElement('img');
+    img.src = thumb;
+    img.alt = item.title || '';
+    img.loading = 'lazy';
+    div.appendChild(img);
+    div.addEventListener('click', function() { insertGif(full, item.title); });
     grid.appendChild(div);
   });
-
-  document.getElementById('loadMore').style.display = data?.data?.has_next ? 'block' : 'none';
+  document.getElementById('loadMore').style.display = (data.data && data.data.has_next) ? 'block' : 'none';
 }
 
 function setStatus(msg) {
@@ -149,5 +150,14 @@ function setStatus(msg) {
   s.style.display = msg ? 'block' : 'none';
 }
 
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(function() { t.style.display = 'none'; }, 1800);
+}
+
 doTrending();
 </script>
+</body>
+</html>
