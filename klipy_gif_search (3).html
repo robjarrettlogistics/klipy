@@ -1,0 +1,132 @@
+
+<style>
+* { box-sizing: border-box; }
+#app { padding: 1rem 0; font-family: var(--font-sans); }
+.tab-row { display: flex; gap: 6px; margin-bottom: 1rem; }
+.tab { padding: 6px 14px; border-radius: var(--radius); border: 0.5px solid var(--border); background: transparent; cursor: pointer; font-size: 13px; color: var(--text-secondary); }
+.tab.active { background: var(--bg-accent); color: var(--text-accent); border-color: var(--border-accent); }
+.search-row { display: flex; gap: 8px; margin-bottom: 1rem; }
+.search-row input { flex: 1; }
+.gif-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; }
+.gif-item { border-radius: var(--radius); overflow: hidden; background: var(--surface-1); aspect-ratio: 1; }
+.gif-item img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: grab; }
+.status { font-size: 13px; color: var(--text-muted); text-align: center; padding: 2rem 0; }
+.attribution { font-size: 11px; color: var(--text-muted); text-align: right; margin-top: 8px; }
+.load-more { display: block; width: 100%; margin-top: 12px; }
+</style>
+
+<div id="app">
+  <h2 class="sr-only">Klipy GIF search widget</h2>
+  <div class="tab-row">
+    <button class="tab active" data-tab="gifs">GIFs</button>
+    <button class="tab" data-tab="stickers">Stickers</button>
+    <button class="tab" data-tab="memes">Memes</button>
+  </div>
+  <div class="search-row">
+    <input id="query" type="text" placeholder="Search KLIPY" />
+    <button onclick="doSearch()">Search</button>
+    <button onclick="doTrending()">Trending</button>
+  </div>
+  <div id="grid" class="gif-grid"></div>
+  <div id="status" class="status"></div>
+  <button id="loadMore" class="load-more" style="display:none" onclick="loadMore()">Load more</button>
+  <div class="attribution">Powered by KLIPY</div>
+</div>
+
+<script>
+const API_KEY = 'YXxLGyFs86hGcanamfKx7dFwR4WKuE2YrBQUNQGsqTmi36v4cKZR5BlHgjbo7TZz';
+let currentTab = 'gifs';
+let currentPage = 1;
+let currentQuery = '';
+let isTrending = false;
+
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    currentTab = t.dataset.tab;
+    currentPage = 1;
+    document.getElementById('grid').innerHTML = '';
+    document.getElementById('loadMore').style.display = 'none';
+    if (isTrending) doTrending(); else if (currentQuery) doSearch(true);
+  });
+});
+
+document.getElementById('query').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+
+async function fetchItems(url) {
+  setStatus('Loading...');
+  try {
+    const res = await fetch(url);
+    if (!res.ok) { setStatus(`API error ${res.status}.`); return null; }
+    return await res.json();
+  } catch(e) {
+    setStatus('Request failed. Check your network connection.');
+    return null;
+  }
+}
+
+async function doSearch(silent) {
+  const q = silent ? currentQuery : document.getElementById('query').value.trim();
+  if (!q) { setStatus('Enter a search term.'); return; }
+  currentQuery = q;
+  isTrending = false;
+  currentPage = 1;
+  document.getElementById('grid').innerHTML = '';
+  const data = await fetchItems(`https://api.klipy.com/api/v1/${API_KEY}/${currentTab}/search?q=${encodeURIComponent(q)}&per_page=24&page=1`);
+  if (data) renderItems(data, true);
+}
+
+async function doTrending() {
+  isTrending = true;
+  currentQuery = '';
+  currentPage = 1;
+  document.getElementById('grid').innerHTML = '';
+  const data = await fetchItems(`https://api.klipy.com/api/v1/${API_KEY}/${currentTab}/trending?per_page=24&page=1`);
+  if (data) renderItems(data, true);
+}
+
+async function loadMore() {
+  currentPage++;
+  const url = isTrending
+    ? `https://api.klipy.com/api/v1/${API_KEY}/${currentTab}/trending?per_page=24&page=${currentPage}`
+    : `https://api.klipy.com/api/v1/${API_KEY}/${currentTab}/search?q=${encodeURIComponent(currentQuery)}&per_page=24&page=${currentPage}`;
+  const data = await fetchItems(url);
+  if (data) renderItems(data, false);
+}
+
+function renderItems(data, replace) {
+  const grid = document.getElementById('grid');
+  const items = data?.data?.data || [];
+  if (replace) grid.innerHTML = '';
+  if (items.length === 0) { setStatus('No results found.'); document.getElementById('loadMore').style.display = 'none'; return; }
+  setStatus('');
+
+  items.forEach(item => {
+    const file = item.file || {};
+    const thumb = file.sm?.gif?.url || file.xs?.gif?.url || file.md?.gif?.url || '';
+    if (!thumb) return;
+    const div = document.createElement('div');
+    div.className = 'gif-item';
+    const img = document.createElement('img');
+    img.src = thumb;
+    img.alt = item.title || '';
+    img.loading = 'lazy';
+    img.draggable = true;
+    div.appendChild(img);
+    grid.appendChild(div);
+  });
+
+  document.getElementById('loadMore').style.display = data?.data?.has_next ? 'block' : 'none';
+}
+
+function setStatus(msg) {
+  const s = document.getElementById('status');
+  s.textContent = msg;
+  s.style.display = msg ? 'block' : 'none';
+}
+
+doTrending();
+</script>
