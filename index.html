@@ -8,10 +8,13 @@
 .search-row { display: flex; gap: 8px; margin-bottom: 1rem; }
 .search-row input { flex: 1; }
 .gif-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; }
-.gif-item { border-radius: var(--radius); overflow: hidden; background: var(--surface-1); aspect-ratio: 1; cursor: grab; }
-.gif-item:active { cursor: grabbing; }
+.gif-item { position: relative; border-radius: var(--radius); overflow: hidden; background: var(--surface-1); aspect-ratio: 1; cursor: pointer; }
 .gif-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gif-item .copied-badge { position: absolute; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.15s; pointer-events: none; }
+.gif-item .copied-badge span { color: #fff; font-size: 12px; font-weight: 500; background: rgba(0,0,0,0.6); padding: 4px 10px; border-radius: var(--radius); }
+.gif-item.copied .copied-badge { opacity: 1; }
 .status { font-size: 13px; color: var(--text-muted); text-align: center; padding: 2rem 0; }
+.hint { font-size: 12px; color: var(--text-muted); margin-bottom: 1rem; }
 .attribution { font-size: 11px; color: var(--text-muted); text-align: right; margin-top: 8px; }
 .load-more { display: block; width: 100%; margin-top: 12px; }
 </style>
@@ -28,6 +31,7 @@
     <button onclick="doSearch()">Search</button>
     <button onclick="doTrending()">Trending</button>
   </div>
+  <p class="hint">Click any GIF to copy it to your clipboard, then paste it into your editor.</p>
   <div id="grid" class="gif-grid"></div>
   <div id="status" class="status"></div>
   <button id="loadMore" class="load-more" style="display:none" onclick="loadMore()">Load more</button>
@@ -98,18 +102,23 @@ async function loadMore() {
   if (data) renderItems(data, false);
 }
 
-function makeDraggable(div, gifUrl, title) {
-  div.draggable = true;
-  div.addEventListener('dragstart', async (e) => {
-    e.dataTransfer.setData('text/uri-list', gifUrl);
-    e.dataTransfer.setData('text/plain', gifUrl);
+async function copyGif(div, url) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    await navigator.clipboard.write([
+      new ClipboardItem({ 'image/gif': blob })
+    ]);
+    div.classList.add('copied');
+    setTimeout(() => div.classList.remove('copied'), 1500);
+  } catch(e) {
+    // fallback: copy URL as text
     try {
-      const res = await fetch(gifUrl);
-      const blob = await res.blob();
-      const file = new File([blob], `${title || 'image'}.gif`, { type: 'image/gif' });
-      e.dataTransfer.items.add(file);
+      await navigator.clipboard.writeText(url);
+      div.classList.add('copied');
+      setTimeout(() => div.classList.remove('copied'), 1500);
     } catch(_) {}
-  });
+  }
 }
 
 function renderItems(data, replace) {
@@ -126,13 +135,8 @@ function renderItems(data, replace) {
     if (!thumb) return;
     const div = document.createElement('div');
     div.className = 'gif-item';
-    const img = document.createElement('img');
-    img.src = thumb;
-    img.alt = item.title || '';
-    img.loading = 'lazy';
-    img.draggable = false;
-    div.appendChild(img);
-    makeDraggable(div, full, item.title);
+    div.innerHTML = `<img src="${thumb}" alt="${item.title || ''}" loading="lazy"><div class="copied-badge"><span>Copied!</span></div>`;
+    div.addEventListener('click', () => copyGif(div, full));
     grid.appendChild(div);
   });
 
