@@ -9,7 +9,7 @@
 .search-row input { flex: 1; }
 .gif-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; }
 .gif-item { border-radius: var(--radius); overflow: hidden; background: var(--surface-1); aspect-ratio: 1; }
-.gif-item img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: grab; }
+.gif-item img { width: 100%; height: 100%; object-fit: cover; display: block; user-select: none; pointer-events: none; }
 .status { font-size: 13px; color: var(--text-muted); text-align: center; padding: 2rem 0; }
 .attribution { font-size: 11px; color: var(--text-muted); text-align: right; margin-top: 8px; }
 .load-more { display: block; width: 100%; margin-top: 12px; }
@@ -114,7 +114,7 @@ function renderItems(data, replace) {
     img.src = thumb;
     img.alt = item.title || '';
     img.loading = 'lazy';
-    img.draggable = true;
+    img.draggable = false;
     div.appendChild(img);
     grid.appendChild(div);
   });
