@@ -1,178 +1,175 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>GIF Picker</title>
-<script type="text/javascript" src="//dl.frontapp.com/libs/plugin-sdk-1.0.1.min.js"></script>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #222; }
-#app { padding: 12px; }
-.tab-row { display: flex; gap: 5px; margin-bottom: 10px; }
-.tab { flex: 1; padding: 5px 0; border-radius: 6px; border: 1px solid #ddd; background: transparent; cursor: pointer; font-size: 12px; color: #666; }
-.tab.active { background: #e8f0fe; color: #1a73e8; border-color: #1a73e8; }
-.search-row { display: flex; gap: 6px; margin-bottom: 10px; }
-.search-row input { flex: 1; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
-.search-row button { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 12px; color: #444; }
-.search-row button:hover { background: #f5f5f5; }
-.gif-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 5px; }
-.gif-item { border-radius: 6px; overflow: hidden; background: #f0f0f0; aspect-ratio: 1; cursor: pointer; position: relative; }
-.gif-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.gif-item:hover::after { content: 'Insert'; position: absolute; inset: 0; background: rgba(0,0,0,0.45); color: #fff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
-.status { font-size: 12px; color: #999; text-align: center; padding: 20px 0; }
-.context-status { font-size: 11px; padding: 4px 8px; border-radius: 4px; margin-bottom: 8px; text-align: center; }
-.context-status.ready { background: #e6f4ea; color: #1e8e3e; }
-.context-status.waiting { background: #fef3e2; color: #b06000; }
-.toast { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; font-size: 12px; padding: 6px 14px; border-radius: 6px; display: none; z-index: 99; }
-.load-more { display: block; width: 100%; margin-top: 10px; padding: 7px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 12px; color: #444; }
-.attribution { font-size: 10px; color: #bbb; text-align: right; margin-top: 8px; }
-</style>
+  <meta charset="UTF-8">
+  <title>Klipy GIF Search - Front Sidebar</title>
+  <!-- Include Front's Plugin SDK Script -->
+  <script src="https://dl.frontapp.com/libs/frontjs.development.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 10px;
+      background-color: #ffffff;
+      color: #333;
+    }
+    .search-container {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #dcdcdc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #4a90e2;
+    }
+    button {
+      background-color: #4a90e2;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    button:hover {
+      background-color: #357abd;
+    }
+    .gif-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .gif-item {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color 0.2s ease;
+    }
+    .gif-item:hover {
+      border-color: #4a90e2;
+    }
+    .status-msg {
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+      margin-top: 10px;
+    }
+  </style>
 </head>
 <body>
-<div id="app">
-  <div id="contextStatus" class="context-status waiting">Waiting for Front context...</div>
-  <div class="tab-row">
-    <button class="tab active" data-tab="gifs">GIFs</button>
-    <button class="tab" data-tab="stickers">Stickers</button>
-    <button class="tab" data-tab="memes">Memes</button>
+
+  <div class="search-container">
+    <input type="text" id="search-input" placeholder="Search Klipy GIFs..." />
+    <button id="search-btn">Search</button>
   </div>
-  <div class="search-row">
-    <input id="query" type="text" placeholder="Search KLIPY" />
-    <button onclick="doSearch()">Search</button>
-    <button onclick="doTrending()">Trending</button>
+
+  <div class="gif-grid" id="gif-results">
+    <!-- GIFs will be injected here dynamically -->
   </div>
-  <div id="grid" class="gif-grid"></div>
-  <div id="status" class="status">Loading trending...</div>
-  <button id="loadMore" class="load-more" style="display:none" onclick="loadMore()">Load more</button>
-  <div class="attribution">Powered by KLIPY</div>
-</div>
-<div id="toast" class="toast"></div>
 
-<script>
-const API_KEY = 'YXxLGyFs86hGcanamfKx7dFwR4WKuE2YrBQUNQGsqTmi36v4cKZR5BlHgjbo7TZz';
-let currentTab = 'gifs';
-let currentPage = 1;
-let currentQuery = '';
-let isTrending = false;
-let frontContext = null;
+  <div id="status" class="status-msg">Loading plugin configuration...</div>
 
-// Subscribe to Front context updates
-Front.contextUpdates.subscribe(function(context) {
-  frontContext = context;
-  var el = document.getElementById('contextStatus');
-  el.textContent = 'Front connected — click a GIF to insert';
-  el.className = 'context-status ready';
-});
+  <script>
+    // Extract the API key securely from the URL parameter (?key=YOUR_KEY)
+    const urlParams = new URLSearchParams(window.location.search);
+    const klipyApiKey = urlParams.get('key');
 
-document.querySelectorAll('.tab').forEach(function(t) {
-  t.addEventListener('click', function() {
-    document.querySelectorAll('.tab').forEach(function(x) { x.classList.remove('active'); });
-    t.classList.add('active');
-    currentTab = t.dataset.tab;
-    currentPage = 1;
-    document.getElementById('grid').innerHTML = '';
-    document.getElementById('loadMore').style.display = 'none';
-    if (isTrending) doTrending(); else if (currentQuery) doSearch(true);
-  });
-});
+    // Initialize Front SDK
+    Front.on('config', (context) => {
+      if (!klipyApiKey) {
+        updateStatus("Error: 'key' query parameter is missing from the sidebar URL setup in Front.");
+      } else {
+        updateStatus("Connected to Front. Ready to search.");
+      }
+    });
 
-document.getElementById('query').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') doSearch();
-});
+    // Handle Search Action
+    document.getElementById('search-btn').addEventListener('click', performSearch);
+    document.getElementById('search-input').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') performSearch();
+    });
 
-async function fetchItems(url) {
-  setStatus('Loading...');
-  try {
-    var res = await fetch(url);
-    if (!res.ok) { setStatus('API error ' + res.status + '.'); return null; }
-    return await res.json();
-  } catch(e) {
-    setStatus('Request failed.');
-    return null;
-  }
-}
+    async function performSearch() {
+      if (!klipyApiKey) {
+        updateStatus("Cannot search: Klipy API Key is missing from the URL.");
+        return;
+      }
 
-async function doSearch(silent) {
-  var q = silent ? currentQuery : document.getElementById('query').value.trim();
-  if (!q) { setStatus('Enter a search term.'); return; }
-  currentQuery = q;
-  isTrending = false;
-  currentPage = 1;
-  document.getElementById('grid').innerHTML = '';
-  var data = await fetchItems('https://api.klipy.com/api/v1/' + API_KEY + '/' + currentTab + '/search?q=' + encodeURIComponent(q) + '&per_page=24&page=1');
-  if (data) renderItems(data, true);
-}
+      const query = document.getElementById('search-input').value.trim();
+      if (!query) return;
 
-async function doTrending() {
-  isTrending = true;
-  currentQuery = '';
-  currentPage = 1;
-  document.getElementById('grid').innerHTML = '';
-  var data = await fetchItems('https://api.klipy.com/api/v1/' + API_KEY + '/' + currentTab + '/trending?per_page=24&page=1');
-  if (data) renderItems(data, true);
-}
+      const grid = document.getElementById('gif-results');
+      grid.innerHTML = '<div style="grid-column: span 2; text-align:center; padding:20px;">Searching...</div>';
 
-async function loadMore() {
-  currentPage++;
-  var url = isTrending
-    ? 'https://api.klipy.com/api/v1/' + API_KEY + '/' + currentTab + '/trending?per_page=24&page=' + currentPage
-    : 'https://api.klipy.com/api/v1/' + API_KEY + '/' + currentTab + '/search?q=' + encodeURIComponent(currentQuery) + '&per_page=24&page=' + currentPage;
-  var data = await fetchItems(url);
-  if (data) renderItems(data, false);
-}
+      try {
+        const url = `https://api.klipy.com/api/v1/${klipyApiKey}/gifs/search?q=${encodeURIComponent(query)}&per_page=20`;
+        const response = await fetch(url);
+        const data = await response.json();
 
-function insertGif(url, title) {
-  var html = '<img src="' + url + '" alt="' + (title || 'GIF') + '" style="max-width:100%;" />';
-  if (frontContext && typeof frontContext.insertHTML === 'function') {
-    frontContext.insertHTML(html);
-    showToast('Inserted!');
-  } else if (typeof Front !== 'undefined' && typeof Front.insertHTML === 'function') {
-    Front.insertHTML(html);
-    showToast('Inserted!');
-  } else {
-    showToast('Open a reply or comment first');
-  }
-}
+        grid.innerHTML = ''; // Clear loading state
 
-function renderItems(data, replace) {
-  var grid = document.getElementById('grid');
-  var items = (data && data.data && data.data.data) ? data.data.data : [];
-  if (replace) grid.innerHTML = '';
-  if (items.length === 0) { setStatus('No results found.'); document.getElementById('loadMore').style.display = 'none'; return; }
-  setStatus('');
-  items.forEach(function(item) {
-    var file = item.file || {};
-    var thumb = (file.sm && file.sm.gif && file.sm.gif.url) || (file.xs && file.xs.gif && file.xs.gif.url) || (file.md && file.md.gif && file.md.gif.url) || '';
-    var full  = (file.md && file.md.gif && file.md.gif.url) || (file.hd && file.hd.gif && file.hd.gif.url) || thumb;
-    if (!thumb) return;
-    var div = document.createElement('div');
-    div.className = 'gif-item';
-    var img = document.createElement('img');
-    img.src = thumb;
-    img.alt = item.title || '';
-    img.loading = 'lazy';
-    div.appendChild(img);
-    div.addEventListener('click', function() { insertGif(full, item.title); });
-    grid.appendChild(div);
-  });
-  document.getElementById('loadMore').style.display = (data.data && data.data.has_next) ? 'block' : 'none';
-}
+        const gifs = data.data || data.results || [];
 
-function setStatus(msg) {
-  var s = document.getElementById('status');
-  s.textContent = msg;
-  s.style.display = msg ? 'block' : 'none';
-}
+        if (gifs.length === 0) {
+          grid.innerHTML = '<div style="grid-column: span 2; text-align:center; padding:20px;">No GIFs found.</div>';
+          return;
+        }
 
-function showToast(msg) {
-  var t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.display = 'block';
-  setTimeout(function() { t.style.display = 'none'; }, 1800);
-}
+        gifs.forEach(gif => {
+          const gifUrl = gif.files?.original?.url || gif.src || gif.url;
+          
+          if (gifUrl) {
+            const img = document.createElement('img');
+            img.src = gifUrl;
+            img.className = 'gif-item';
+            img.alt = gif.title || 'Klipy GIF';
+            img.addEventListener('click', () => insertGifIntoFront(gifUrl));
+            grid.appendChild(img);
+          }
+        });
 
-doTrending();
-</script>
+      } catch (error) {
+        console.error('Error fetching from Klipy:', error);
+        grid.innerHTML = '<div style="grid-column: span 2; color:red; text-align:center; padding:20px;">Error loading GIFs.</div>';
+      }
+    }
+
+    // Insert Image Tag into Front Canvas
+    function insertGifIntoFront(url) {
+      const htmlToInsert = `<img src="${url}" alt="GIF" style="max-width: 100%; height: auto;" />`;
+
+      Front.getSidebarContext().then((context) => {
+        if (context.hasDraft) {
+          context.insertHtml(htmlToInsert);
+          updateStatus("Inserted into email draft!");
+        } else {
+          Front.comment({
+            html: htmlToInsert
+          });
+          updateStatus("Inserted into comment box!");
+        }
+      }).catch((err) => {
+        console.error("SDK Error:", err);
+        updateStatus("Failed to insert. Make sure a conversation is open.");
+      });
+    }
+
+    function updateStatus(msg) {
+      document.getElementById('status').innerText = msg;
+    }
+  </script>
 </body>
 </html>
