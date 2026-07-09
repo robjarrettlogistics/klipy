@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>GIF Picker v1.1.1</title>
+<title>GIF Picker v1.1.2</title>
 <!-- MODERN SDK: 1.8.1 -->
 <script type="text/javascript" src="https://dl.frontapp.com/libs/plugin-sdk-1.8.1.min.js"></script>
 <style>
@@ -46,7 +46,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <button onclick="doSearch()">Search</button>
   </div>
   <div id="grid" class="gif-grid"></div>
-  <div class="version">v1.1.1</div>
+  <div class="version">v1.1.2</div>
 </div>
 
 <script>
@@ -54,7 +54,6 @@ const API_KEY = 'YXxLGyFs86hGcanamfKx7dFwR4WKuE2YrBQUNQGsqTmi36v4cKZR5BlHgjbo7TZ
 let currentTab = 'gifs';
 const statusEl = document.getElementById('contextStatus');
 
-// Setup tab switching
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', (e) => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -66,27 +65,9 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 if (typeof Front !== 'undefined') {
   Front.contextUpdates.subscribe(context => {
-    statusEl.textContent = 'Ready: Drag, or Click to Attach';
+    statusEl.textContent = 'Ready: Drag, or Click to Copy';
     statusEl.className = 'context-status ready';
   });
-}
-
-// Iframe-safe copy fallback
-function copyTextToClipboard(text) {
-  const textArea = document.createElement("textarea");
-  textArea.value = text;
-  textArea.style.position = "fixed"; // prevent scrolling
-  document.body.appendChild(textArea);
-  textArea.focus();
-  textArea.select();
-  try {
-    document.execCommand('copy');
-    return true;
-  } catch (err) {
-    return false;
-  } finally {
-    document.body.removeChild(textArea);
-  }
 }
 
 async function doSearch() {
@@ -97,7 +78,7 @@ async function doSearch() {
     const res = await fetch(url);
     const data = await res.json();
     renderItems(data);
-    statusEl.textContent = 'Ready: Drag, or Click to Attach';
+    statusEl.textContent = 'Ready: Drag, or Click to Copy';
   } catch(e) { 
     statusEl.textContent = 'Search failed'; 
     statusEl.className = 'context-status error'; 
@@ -122,72 +103,69 @@ function renderItems(data) {
     
     let gifFile = null;
 
-    // 1. Pre-fetch blob for native drag-and-drop file support
-    div.addEventListener('mouseenter', async () => {
-      if (!gifFile) {
-        try {
-          const response = await fetch(full);
-          const blob = await response.blob();
-          gifFile = new File([blob], "klipy.gif", { type: "image/gif" });
-        } catch (e) { console.error('Prefetch failed'); }
+    // 1. TRUE FILE DRAG (Bypasses URL Sanitizer)
+    img.addEventListener('dragstart', async (e) => {
+      try {
+        const response = await fetch(full);
+        const blob = await response.blob();
+        gifFile = new File([blob], "klipy.gif", { type: "image/gif" });
+        e.dataTransfer.items.add(gifFile);
+      } catch(err) {
+        e.dataTransfer.setData('text/plain', full);
       }
     });
 
-    // 2. TRUE FILE DRAG (Bypasses Front URL Sanitizer)
-    img.addEventListener('dragstart', (e) => {
-      if (gifFile) {
-        try {
-          // Add the true file object to the drag payload
-          e.dataTransfer.items.add(gifFile);
-        } catch(err) {
-          e.dataTransfer.setData('text/plain', full);
-        }
-      } else {
-         e.dataTransfer.setData('text/plain', full);
-      }
-    });
-
-    // 3. CLICK TO ATTACH OR COPY (For Mobile & Internal Comments)
+    // 2. RICH TEXT CLIPBOARD (For Internal Comments)
     div.addEventListener('click', async () => {
       statusEl.textContent = 'Processing...';
 
-      if (!gifFile) {
-        try {
-          const response = await fetch(full);
-          const blob = await response.blob();
-          gifFile = new File([blob], "klipy.gif", { type: "image/gif" });
-        } catch (e) {}
-      }
+      const htmlPayload = `<img src="${full}" alt="KLIPY GIF">`;
+      const markdownPayload = `![KLIPY GIF](${full})`;
 
-      // Attempt A: Native Front Attachment (Works for Email Composer)
-      if (typeof Front !== 'undefined' && gifFile) {
+      try {
+        // Attempt A: Modern Clipboard API
+        const htmlBlob = new Blob([htmlPayload], { type: 'text/html' });
+        const textBlob = new Blob([markdownPayload], { type: 'text/plain' });
+        
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/html': htmlBlob,
+            'text/plain': textBlob
+          })
+        ]);
+        statusEl.textContent = 'Copied image! Paste into comment box.';
+      } catch (err) {
+        // Attempt B: Iframe-safe execCommand fallback
+        const tempDiv = document.createElement("div");
+        tempDiv.contentEditable = true;
+        tempDiv.innerHTML = htmlPayload;
+        tempDiv.style.position = "fixed";
+        tempDiv.style.opacity = 0;
+        document.body.appendChild(tempDiv);
+        
+        const range = document.createRange();
+        range.selectNodeContents(tempDiv);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        
         try {
-          await Front.createAttachment(gifFile);
-          statusEl.textContent = 'Attached to email!';
-          resetStatus();
-          return;
-        } catch (err) {
-          // Expected to fail if we are inside an Internal Comment
-        }
-      }
-
-      // Attempt B: Iframe-safe link copy (Works for Internal Comments)
-      const copied = copyTextToClipboard(full);
-      if (copied) {
-          statusEl.textContent = 'Link copied! Paste into comment box.';
-      } else {
-          statusEl.textContent = 'Action failed.';
+          document.execCommand("copy");
+          statusEl.textContent = 'Copied image! Paste into comment box.';
+        } catch (e) {
+          statusEl.textContent = 'Copy blocked by Front settings.';
           statusEl.className = 'context-status error';
+        }
+        
+        sel.removeAllRanges();
+        document.body.removeChild(tempDiv);
       }
-      resetStatus();
-    });
-
-    function resetStatus() {
+      
       setTimeout(() => {
-          statusEl.textContent = 'Ready: Drag, or Click to Attach/Copy';
-          statusEl.className = 'context-status ready';
+        statusEl.textContent = 'Ready: Drag, or Click to Copy';
+        statusEl.className = 'context-status ready';
       }, 3000);
-    }
+    });
 
     grid.appendChild(div);
   });
