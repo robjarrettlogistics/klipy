@@ -2,13 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>GIF Picker v1.0.7</title>
-<!-- MODERN SDK: 1.8.1 -->
+<title>GIF Picker v1.0.8</title>
 <script type="text/javascript" src="https://dl.frontapp.com/libs/plugin-sdk-1.8.1.min.js"></script>
 <style>
+/* (All CSS from v1.0.7 remains the same for consistency) */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #222; }
-/* Dark Mode Support */
 @media (prefers-color-scheme: dark) {
   body { background: #1e1e1e; color: #f0f0f0; }
   .tab { border-color: #555; color: #bbb; }
@@ -26,7 +25,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .search-row button { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 12px; }
 .gif-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 5px; }
 .gif-item { border-radius: 6px; overflow: hidden; background: #f0f0f0; aspect-ratio: 1; cursor: pointer; }
-.gif-item img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: grab; }
+.gif-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .context-status { font-size: 11px; padding: 4px 8px; border-radius: 4px; margin-bottom: 8px; text-align: center; background: #fef3e2; color: #b06000; }
 .context-status.ready { background: #e6f4ea; color: #1e8e3e; }
 .context-status.error { background: #fce8e6; color: #d93025; }
@@ -46,7 +45,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <button onclick="doSearch()">Search</button>
   </div>
   <div id="grid" class="gif-grid"></div>
-  <div class="version">v1.0.7</div>
+  <div class="version">v1.0.8</div>
 </div>
 
 <script>
@@ -55,8 +54,8 @@ let currentTab = 'gifs';
 const statusEl = document.getElementById('contextStatus');
 
 if (typeof Front !== 'undefined') {
-  Front.contextUpdates.subscribe(function(context) {
-    statusEl.textContent = 'Ready: Drag GIF into your reply';
+  Front.contextUpdates.subscribe(context => {
+    statusEl.textContent = 'Ready: Click a GIF to attach';
     statusEl.className = 'context-status ready';
   });
 }
@@ -65,15 +64,10 @@ async function doSearch() {
   const q = document.getElementById('query').value.trim();
   const url = `https://api.klipy.com/api/v1/${API_KEY}/${currentTab}/search?q=${encodeURIComponent(q)}&per_page=24&page=1`;
   try {
-    statusEl.textContent = 'Searching...';
     const res = await fetch(url);
     const data = await res.json();
     renderItems(data);
-    statusEl.textContent = 'Ready: Drag GIF into your reply';
-  } catch(e) { 
-    statusEl.textContent = 'Search failed'; 
-    statusEl.className = 'context-status error'; 
-  }
+  } catch(e) { console.error(e); }
 }
 
 function renderItems(data) {
@@ -86,30 +80,23 @@ function renderItems(data) {
     const full = item.file?.md?.gif?.url || '';
     const div = document.createElement('div');
     div.className = 'gif-item';
+    div.innerHTML = `<img src="${thumb}" />`;
     
-    const img = document.createElement('img');
-    img.src = thumb;
-    img.draggable = true; 
-    
-    // Base64 encoding for drag-and-drop persistence
-    img.addEventListener('dragstart', async function(e) {
-      statusEl.textContent = 'Preparing image...';
+    div.addEventListener('click', async () => {
+      statusEl.textContent = 'Uploading...';
       try {
-        const response = await fetch(full);
-        const blob = await response.blob();
-        const reader = new FileReader();
-        reader.readAsDataURL(blob);
-        reader.onloadend = function() {
-          e.dataTransfer.setData('text/html', `<img src="${reader.result}" alt="GIF" />`);
-          statusEl.textContent = 'Ready to drop!';
-        };
+        const res = await fetch(full);
+        const blob = await res.blob();
+        const file = new File([blob], "image.gif", { type: "image/gif" });
+        
+        // This is the "Gold Standard" for Front plugins
+        await Front.createAttachment(file);
+        statusEl.textContent = 'Attached to reply!';
       } catch (err) {
-        statusEl.textContent = 'Drag failed';
+        statusEl.textContent = 'Failed to attach.';
         statusEl.className = 'context-status error';
       }
     });
-    
-    div.appendChild(img);
     grid.appendChild(div);
   });
 }
