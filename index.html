@@ -2,63 +2,101 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>GIF Composer v1.2.0</title>
+<title>GIF Picker v1.0.8</title>
 <script type="text/javascript" src="https://dl.frontapp.com/libs/plugin-sdk-1.8.1.min.js"></script>
 <style>
+/* (All CSS from v1.0.7 remains the same for consistency) */
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, sans-serif; font-size: 12px; background: #fff; padding: 5px; }
-.search-box { display: flex; gap: 4px; margin-bottom: 5px; }
-input { flex: 1; padding: 4px; border: 1px solid #ccc; border-radius: 4px; }
-button { padding: 4px 8px; cursor: pointer; }
-.gif-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-.gif-item { aspect-ratio: 1; overflow: hidden; border-radius: 4px; cursor: grab; background: #eee; }
-.gif-item img { width: 100%; height: 100%; object-fit: cover; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #222; }
+@media (prefers-color-scheme: dark) {
+  body { background: #1e1e1e; color: #f0f0f0; }
+  .tab { border-color: #555; color: #bbb; }
+  .tab.active { background: #2d3e50; color: #8ab4f8; border-color: #8ab4f8; }
+  .search-row input { background: #2d2d2d; border-color: #444; color: #fff; }
+  .search-row button { background: #333; border-color: #555; color: #ddd; }
+  .gif-item { background: #2d2d2d; }
+}
+#app { padding: 12px; }
+.tab-row { display: flex; gap: 5px; margin-bottom: 10px; }
+.tab { flex: 1; padding: 5px 0; border-radius: 6px; border: 1px solid #ddd; background: transparent; cursor: pointer; font-size: 12px; color: #666; }
+.tab.active { background: #e8f0fe; color: #1a73e8; border-color: #1a73e8; }
+.search-row { display: flex; gap: 6px; margin-bottom: 10px; }
+.search-row input { flex: 1; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+.search-row button { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 12px; }
+.gif-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 5px; }
+.gif-item { border-radius: 6px; overflow: hidden; background: #f0f0f0; aspect-ratio: 1; cursor: pointer; }
+.gif-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.context-status { font-size: 11px; padding: 4px 8px; border-radius: 4px; margin-bottom: 8px; text-align: center; background: #fef3e2; color: #b06000; }
+.context-status.ready { background: #e6f4ea; color: #1e8e3e; }
+.context-status.error { background: #fce8e6; color: #d93025; }
+.version { font-size: 10px; color: #aaa; text-align: center; margin-top: 15px; }
 </style>
 </head>
 <body>
-  <div class="search-box">
-    <input id="query" type="text" placeholder="Search..." />
-    <button onclick="doSearch()">Go</button>
+<div id="app">
+  <div id="contextStatus" class="context-status">Initializing...</div>
+  <div class="tab-row">
+    <button class="tab active" data-tab="gifs">GIFs</button>
+    <button class="tab" data-tab="stickers">Stickers</button>
+    <button class="tab" data-tab="memes">Memes</button>
+  </div>
+  <div class="search-row">
+    <input id="query" type="text" placeholder="Search KLIPY" />
+    <button onclick="doSearch()">Search</button>
   </div>
   <div id="grid" class="gif-grid"></div>
+  <div class="version">v1.0.8</div>
+</div>
 
 <script>
 const API_KEY = 'YXxLGyFs86hGcanamfKx7dFwR4WKuE2YrBQUNQGsqTmi36v4cKZR5BlHgjbo7TZz';
+let currentTab = 'gifs';
+const statusEl = document.getElementById('contextStatus');
+
+if (typeof Front !== 'undefined') {
+  Front.contextUpdates.subscribe(context => {
+    statusEl.textContent = 'Ready: Click a GIF to attach';
+    statusEl.className = 'context-status ready';
+  });
+}
 
 async function doSearch() {
   const q = document.getElementById('query').value.trim();
-  const res = await fetch(`https://api.klipy.com/api/v1/${API_KEY}/gifs/search?q=${encodeURIComponent(q)}&per_page=12&page=1`);
-  const data = await res.json();
-  render(data?.data?.data || []);
+  const url = `https://api.klipy.com/api/v1/${API_KEY}/${currentTab}/search?q=${encodeURIComponent(q)}&per_page=24&page=1`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    renderItems(data);
+  } catch(e) { console.error(e); }
 }
 
-function render(items) {
+function renderItems(data) {
   const grid = document.getElementById('grid');
   grid.innerHTML = '';
+  const items = (data && data.data && data.data.data) ? data.data.data : [];
+  
   items.forEach(item => {
-    const thumb = item.file?.sm?.gif?.url;
-    const full = item.file?.md?.gif?.url;
+    const thumb = item.file?.sm?.gif?.url || '';
+    const full = item.file?.md?.gif?.url || '';
     const div = document.createElement('div');
     div.className = 'gif-item';
-    const img = document.createElement('img');
-    img.src = thumb;
-    img.draggable = true;
-
-    // Use native Drag API - Front's composer handles this perfectly
-    img.addEventListener('dragstart', async (e) => {
-      const response = await fetch(full);
-      const blob = await response.blob();
-      const file = new File([blob], "image.gif", { type: "image/gif" });
-      
-      // We pass the dataTransfer so Front recognizes this as a file upload
-      e.dataTransfer.setData('DownloadURL', `image/gif:image.gif:${full}`);
-      // Fallback for some browsers
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(file);
-      e.dataTransfer.setData("application/x-moz-file", file);
+    div.innerHTML = `<img src="${thumb}" />`;
+    
+    div.addEventListener('click', async () => {
+      statusEl.textContent = 'Uploading...';
+      try {
+        const res = await fetch(full);
+        const blob = await res.blob();
+        const file = new File([blob], "image.gif", { type: "image/gif" });
+        
+        // This is the "Gold Standard" for Front plugins
+        await Front.createAttachment(file);
+        statusEl.textContent = 'Attached to reply!';
+      } catch (err) {
+        statusEl.textContent = 'Failed to attach.';
+        statusEl.className = 'context-status error';
+      }
     });
-
-    div.appendChild(img);
     grid.appendChild(div);
   });
 }
