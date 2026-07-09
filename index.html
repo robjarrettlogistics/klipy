@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>GIF Picker v1.0.8</title>
+<title>GIF Picker v1.0.9</title>
+<!-- MODERN SDK: 1.8.1 -->
 <script type="text/javascript" src="https://dl.frontapp.com/libs/plugin-sdk-1.8.1.min.js"></script>
 <style>
-/* (All CSS from v1.0.7 remains the same for consistency) */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #222; }
+/* Dark Mode Support */
 @media (prefers-color-scheme: dark) {
   body { background: #1e1e1e; color: #f0f0f0; }
   .tab { border-color: #555; color: #bbb; }
@@ -45,7 +46,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <button onclick="doSearch()">Search</button>
   </div>
   <div id="grid" class="gif-grid"></div>
-  <div class="version">v1.0.8</div>
+  <div class="version">v1.0.9</div>
 </div>
 
 <script>
@@ -53,9 +54,10 @@ const API_KEY = 'YXxLGyFs86hGcanamfKx7dFwR4WKuE2YrBQUNQGsqTmi36v4cKZR5BlHgjbo7TZ
 let currentTab = 'gifs';
 const statusEl = document.getElementById('contextStatus');
 
+// Initialize SDK
 if (typeof Front !== 'undefined') {
   Front.contextUpdates.subscribe(context => {
-    statusEl.textContent = 'Ready: Click a GIF to attach';
+    statusEl.textContent = 'Ready: Click to copy to clipboard';
     statusEl.className = 'context-status ready';
   });
 }
@@ -64,10 +66,15 @@ async function doSearch() {
   const q = document.getElementById('query').value.trim();
   const url = `https://api.klipy.com/api/v1/${API_KEY}/${currentTab}/search?q=${encodeURIComponent(q)}&per_page=24&page=1`;
   try {
+    statusEl.textContent = 'Searching...';
     const res = await fetch(url);
     const data = await res.json();
     renderItems(data);
-  } catch(e) { console.error(e); }
+    statusEl.textContent = 'Ready: Click to copy to clipboard';
+  } catch(e) { 
+    statusEl.textContent = 'Search failed'; 
+    statusEl.className = 'context-status error'; 
+  }
 }
 
 function renderItems(data) {
@@ -82,18 +89,26 @@ function renderItems(data) {
     div.className = 'gif-item';
     div.innerHTML = `<img src="${thumb}" />`;
     
+    // Clipboard approach: Works in all fields (Internal Comments + Email)
     div.addEventListener('click', async () => {
-      statusEl.textContent = 'Uploading...';
+      statusEl.textContent = 'Copying...';
       try {
         const res = await fetch(full);
         const blob = await res.blob();
-        const file = new File([blob], "image.gif", { type: "image/gif" });
         
-        // This is the "Gold Standard" for Front plugins
-        await Front.createAttachment(file);
-        statusEl.textContent = 'Attached to reply!';
+        await navigator.clipboard.write([
+          new ClipboardItem({ [blob.type]: blob })
+        ]);
+        
+        statusEl.textContent = 'Copied! Now Ctrl+V in your reply/comment';
+        statusEl.className = 'context-status ready';
+        
+        // Reset status after a few seconds
+        setTimeout(() => { 
+          statusEl.textContent = 'Ready: Click to copy to clipboard'; 
+        }, 3000);
       } catch (err) {
-        statusEl.textContent = 'Failed to attach.';
+        statusEl.textContent = 'Copy failed: Permission denied';
         statusEl.className = 'context-status error';
       }
     });
