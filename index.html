@@ -6,8 +6,7 @@
 <script type="text/javascript" src="https://dl.frontapp.com/libs/plugin-sdk-1.8.1.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #222; }
-/* Dark Mode Support */
+body { font-family: -apple-system, sans-serif; background: #fff; color: #222; }
 @media (prefers-color-scheme: dark) {
   body { background: #1e1e1e; color: #f0f0f0; }
   .tab { border-color: #555; color: #bbb; }
@@ -27,12 +26,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .gif-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .context-status { font-size: 11px; padding: 4px 8px; border-radius: 4px; margin-bottom: 8px; text-align: center; background: #fef3e2; color: #b06000; }
 .context-status.ready { background: #e6f4ea; color: #1e8e3e; }
+.context-status.error { background: #fce8e6; color: #d93025; }
 .version { font-size: 10px; color: #aaa; text-align: center; margin-top: 15px; }
 </style>
 </head>
 <body>
 <div id="app">
-  <div id="contextStatus" class="context-status">Initializing Front SDK...</div>
+  <div id="contextStatus" class="context-status">Initializing...</div>
   <div class="tab-row">
     <button class="tab active" data-tab="gifs">GIFs</button>
     <button class="tab" data-tab="stickers">Stickers</button>
@@ -51,16 +51,19 @@ const API_KEY = 'YXxLGyFs86hGcanamfKx7dFwR4WKuE2YrBQUNQGsqTmi36v4cKZR5BlHgjbo7TZ
 let currentTab = 'gifs';
 let isReady = false;
 
-// Initialize SDK 1.8.1
+const statusEl = document.getElementById('contextStatus');
+
 if (typeof Front !== 'undefined') {
   Front.contextUpdates.subscribe(function(context) {
     isReady = true;
-    document.getElementById('contextStatus').textContent = 'Ready: Click a GIF to insert';
-    document.getElementById('contextStatus').className = 'context-status ready';
+    statusEl.textContent = 'Ready: Tap a GIF to insert';
+    statusEl.className = 'context-status ready';
   });
+} else {
+  statusEl.textContent = 'Error: Front SDK missing';
+  statusEl.className = 'context-status error';
 }
 
-// Search Logic from your working version
 async function doSearch() {
   const q = document.getElementById('query').value.trim();
   const url = `https://api.klipy.com/api/v1/${API_KEY}/${currentTab}/search?q=${encodeURIComponent(q)}&per_page=24&page=1`;
@@ -68,28 +71,31 @@ async function doSearch() {
     const res = await fetch(url);
     const data = await res.json();
     renderItems(data);
-  } catch(e) { console.error(e); }
+  } catch(e) { statusEl.textContent = 'Search failed'; statusEl.className = 'context-status error'; }
 }
 
 function renderItems(data) {
   const grid = document.getElementById('grid');
   grid.innerHTML = '';
-  // Your specific Klipy data structure
   const items = (data && data.data && data.data.data) ? data.data.data : [];
   
   items.forEach(item => {
     const thumb = item.file?.sm?.gif?.url || '';
     const full = item.file?.md?.gif?.url || '';
-    
     const div = document.createElement('div');
     div.className = 'gif-item';
     div.innerHTML = `<img src="${thumb}" />`;
-    
     div.addEventListener('click', function() {
-      if (isReady && typeof Front !== 'undefined') {
-        Front.insertHTML(`<img src="${full}" alt="GIF" style="max-width:100%;" />`);
+      if (isReady) {
+        try {
+          Front.insertHTML(`<img src="${full}" alt="GIF" style="max-width:100%;" />`);
+        } catch (e) {
+          statusEl.textContent = 'Insert failed: Open a reply box';
+          statusEl.className = 'context-status error';
+        }
       } else {
-        alert("Waiting for Front connection...");
+        statusEl.textContent = 'Not connected to Front';
+        statusEl.className = 'context-status error';
       }
     });
     grid.appendChild(div);
