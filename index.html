@@ -80,23 +80,45 @@
     <!-- GIFs will be injected here dynamically -->
   </div>
 
-  <div id="status" class="status-msg">Loading plugin configuration...</div>
+  <div id="status" class="status-msg">Initializing...</div>
 
   <script>
-    // Extract the API key securely from the URL parameter (?key=YOUR_KEY)
+    // 1. Immediately extract the API key from the query parameters (?key=XXXX)
     const urlParams = new URLSearchParams(window.location.search);
     const klipyApiKey = urlParams.get('key');
 
-    // Initialize Front SDK
-    Front.on('config', (context) => {
-      if (!klipyApiKey) {
-        updateStatus("Error: 'key' query parameter is missing from the sidebar URL setup in Front.");
-      } else {
-        updateStatus("Connected to Front. Ready to search.");
-      }
-    });
+    // 2. Defensive check for the API key string
+    if (!klipyApiKey) {
+      updateStatus("Error: '?key=' parameter missing from Front Sidebar URL setup.");
+    } else {
+      updateStatus("Key verified. Waiting for Front initialization...");
+    }
 
-    // Handle Search Action
+    // 3. Fallback/Modern Front Integration Pattern
+    // Instead of exclusively relying on the 'config' event, we use a robust lifecycle catch.
+    try {
+      if (typeof Front !== 'undefined') {
+        // Fallback option A: Listen via legacy or standard layout hooks
+        Front.on('config', (context) => {
+          updateStatus("Ready to search GIFs!");
+        });
+
+        // Fallback option B: Actively poll the sidebar context layout to break any silent thread lock
+        Front.getSidebarContext().then(() => {
+          updateStatus("Ready to search GIFs!");
+        }).catch(() => {
+          // If no message context is open yet, the SDK is still active and working
+          updateStatus("Ready. Open a conversation to insert images.");
+        });
+      } else {
+        updateStatus("Critical Error: Front SDK object not found.");
+      }
+    } catch (e) {
+      console.error("SDK Initialization failed:", e);
+      updateStatus("Initialization error. Check console logs.");
+    }
+
+    // Handle Search Input / Button Actions
     document.getElementById('search-btn').addEventListener('click', performSearch);
     document.getElementById('search-input').addEventListener('keypress', function(e) {
       if (e.key === 'Enter') performSearch();
@@ -104,7 +126,7 @@
 
     async function performSearch() {
       if (!klipyApiKey) {
-        updateStatus("Cannot search: Klipy API Key is missing from the URL.");
+        updateStatus("Search blocked: Key query parameter missing.");
         return;
       }
 
@@ -119,7 +141,7 @@
         const response = await fetch(url);
         const data = await response.json();
 
-        grid.innerHTML = ''; // Clear loading state
+        grid.innerHTML = ''; 
 
         const gifs = data.data || data.results || [];
 
@@ -147,7 +169,7 @@
       }
     }
 
-    // Insert Image Tag into Front Canvas
+    // Insert Image into Compose or Comment area
     function insertGifIntoFront(url) {
       const htmlToInsert = `<img src="${url}" alt="GIF" style="max-width: 100%; height: auto;" />`;
 
@@ -163,7 +185,7 @@
         }
       }).catch((err) => {
         console.error("SDK Error:", err);
-        updateStatus("Failed to insert. Make sure a conversation is open.");
+        updateStatus("Error: Please select a conversation thread first.");
       });
     }
 
