@@ -2,119 +2,69 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>GIF Picker v1.0.9</title>
-<!-- MODERN SDK: 1.8.1 -->
-<script type="text/javascript" src="https://dl.frontapp.com/libs/plugin-sdk-1.8.1.min.js"></script>
+<title>GIF Picker v1.1.0</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #222; }
-/* Dark Mode Support */
 @media (prefers-color-scheme: dark) {
   body { background: #1e1e1e; color: #f0f0f0; }
-  .tab { border-color: #555; color: #bbb; }
-  .tab.active { background: #2d3e50; color: #8ab4f8; border-color: #8ab4f8; }
-  .search-row input { background: #2d2d2d; border-color: #444; color: #fff; }
-  .search-row button { background: #333; border-color: #555; color: #ddd; }
   .gif-item { background: #2d2d2d; }
 }
 #app { padding: 12px; }
-.tab-row { display: flex; gap: 5px; margin-bottom: 10px; }
-.tab { flex: 1; padding: 5px 0; border-radius: 6px; border: 1px solid #ddd; background: transparent; cursor: pointer; font-size: 12px; color: #666; }
-.tab.active { background: #e8f0fe; color: #1a73e8; border-color: #1a73e8; }
-.search-row { display: flex; gap: 6px; margin-bottom: 10px; }
-.search-row input { flex: 1; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
-.search-row button { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 12px; }
 .gif-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 5px; }
-.gif-item { border-radius: 6px; overflow: hidden; background: #f0f0f0; aspect-ratio: 1; cursor: pointer; }
+.gif-item { border-radius: 6px; overflow: hidden; background: #f0f0f0; aspect-ratio: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .gif-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.context-status { font-size: 11px; padding: 4px 8px; border-radius: 4px; margin-bottom: 8px; text-align: center; background: #fef3e2; color: #b06000; }
-.context-status.ready { background: #e6f4ea; color: #1e8e3e; }
-.context-status.error { background: #fce8e6; color: #d93025; }
+.context-status { font-size: 11px; padding: 4px 8px; border-radius: 4px; margin-bottom: 8px; text-align: center; background: #e6f4ea; color: #1e8e3e; }
 .version { font-size: 10px; color: #aaa; text-align: center; margin-top: 15px; }
 </style>
 </head>
 <body>
 <div id="app">
-  <div id="contextStatus" class="context-status">Initializing...</div>
-  <div class="tab-row">
-    <button class="tab active" data-tab="gifs">GIFs</button>
-    <button class="tab" data-tab="stickers">Stickers</button>
-    <button class="tab" data-tab="memes">Memes</button>
-  </div>
-  <div class="search-row">
-    <input id="query" type="text" placeholder="Search KLIPY" />
-    <button onclick="doSearch()">Search</button>
-  </div>
+  <div id="contextStatus" class="context-status">Click a GIF to download, then drag into Front</div>
   <div id="grid" class="gif-grid"></div>
-  <div class="version">v1.0.9</div>
+  <div class="version">v1.1.0</div>
 </div>
 
 <script>
 const API_KEY = 'YXxLGyFs86hGcanamfKx7dFwR4WKuE2YrBQUNQGsqTmi36v4cKZR5BlHgjbo7TZz';
-let currentTab = 'gifs';
 const statusEl = document.getElementById('contextStatus');
 
-// Initialize SDK
-if (typeof Front !== 'undefined') {
-  Front.contextUpdates.subscribe(context => {
-    statusEl.textContent = 'Ready: Click to copy to clipboard';
-    statusEl.className = 'context-status ready';
-  });
-}
-
 async function doSearch() {
-  const q = document.getElementById('query').value.trim();
-  const url = `https://api.klipy.com/api/v1/${API_KEY}/${currentTab}/search?q=${encodeURIComponent(q)}&per_page=24&page=1`;
-  try {
-    statusEl.textContent = 'Searching...';
-    const res = await fetch(url);
-    const data = await res.json();
-    renderItems(data);
-    statusEl.textContent = 'Ready: Click to copy to clipboard';
-  } catch(e) { 
-    statusEl.textContent = 'Search failed'; 
-    statusEl.className = 'context-status error'; 
-  }
+  const url = `https://api.klipy.com/api/v1/${API_KEY}/gifs/search?q=funny&per_page=24&page=1`;
+  const res = await fetch(url);
+  const data = await res.json();
+  renderItems(data);
 }
 
 function renderItems(data) {
   const grid = document.getElementById('grid');
   grid.innerHTML = '';
-  const items = (data && data.data && data.data.data) ? data.data.data : [];
+  const items = data?.data?.data || [];
   
   items.forEach(item => {
-    const thumb = item.file?.sm?.gif?.url || '';
-    const full = item.file?.md?.gif?.url || '';
+    const thumb = item.file?.sm?.gif?.url;
+    const full = item.file?.md?.gif?.url;
     const div = document.createElement('div');
     div.className = 'gif-item';
     div.innerHTML = `<img src="${thumb}" />`;
     
-    // Clipboard approach: Works in all fields (Internal Comments + Email)
-    div.addEventListener('click', async () => {
-      statusEl.textContent = 'Copying...';
-      try {
-        const res = await fetch(full);
-        const blob = await res.blob();
-        
-        await navigator.clipboard.write([
-          new ClipboardItem({ [blob.type]: blob })
-        ]);
-        
-        statusEl.textContent = 'Copied! Now Ctrl+V in your reply/comment';
-        statusEl.className = 'context-status ready';
-        
-        // Reset status after a few seconds
-        setTimeout(() => { 
-          statusEl.textContent = 'Ready: Click to copy to clipboard'; 
-        }, 3000);
-      } catch (err) {
-        statusEl.textContent = 'Copy failed: Permission denied';
-        statusEl.className = 'context-status error';
-      }
-    });
+    div.onclick = async () => {
+      statusEl.textContent = 'Downloading...';
+      const response = await fetch(full);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'gif-picker-image.gif';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      statusEl.textContent = 'Downloaded! Now drag it into your comment';
+    };
     grid.appendChild(div);
   });
 }
+doSearch();
 </script>
 </body>
 </html>
