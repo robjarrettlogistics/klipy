@@ -3,51 +3,87 @@
 <head>
   <meta charset="UTF-8">
   <title>Klipy GIF Search - Front Sidebar</title>
-  <!-- Include Front's Plugin SDK Script -->
   <script src="https://dl.frontapp.com/libs/frontjs.development.js"></script>
   <style>
+    /* Default Light Theme Variables */
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #333333;
+      --input-bg: #ffffff;
+      --input-border: #dcdcdc;
+      --btn-bg: #4a90e2;
+      --btn-hover: #357abd;
+      --status-color: #666666;
+      --version-color: #aaaaaa;
+    }
+
+    /* Automatic Dark Theme based on System Settings */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-color: #1e1e1e;
+        --text-color: #f0f0f0;
+        --input-bg: #2d2d2d;
+        --input-border: #444444;
+        --btn-bg: #3a7bc8;
+        --btn-hover: #2a61a0;
+        --status-color: #aaaaaa;
+        --version-color: #666666;
+      }
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       margin: 0;
       padding: 10px;
-      background-color: #ffffff;
-      color: #333;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      box-sizing: border-box;
+      transition: background-color 0.3s ease, color 0.3s ease;
     }
     .search-container {
       display: flex;
       gap: 6px;
       margin-bottom: 12px;
+      flex-shrink: 0;
     }
     input[type="text"] {
       flex: 1;
       padding: 8px 12px;
-      border: 1px solid #dcdcdc;
+      background-color: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-color);
       border-radius: 4px;
       font-size: 14px;
+      transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
     }
     input[type="text"]:focus {
       outline: none;
-      border-color: #4a90e2;
+      border-color: var(--btn-bg);
     }
     button {
-      background-color: #4a90e2;
-      color: white;
+      background-color: var(--btn-bg);
+      color: #ffffff;
       border: none;
       padding: 8px 14px;
       border-radius: 4px;
       cursor: pointer;
       font-weight: 600;
       font-size: 14px;
+      transition: background-color 0.2s ease;
     }
     button:hover {
-      background-color: #357abd;
+      background-color: var(--btn-hover);
     }
     .gif-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 8px;
-      max-height: 80vh;
       overflow-y: auto;
+      flex-grow: 1;
+      padding-bottom: 10px;
     }
     .gif-item {
       width: 100%;
@@ -59,13 +95,24 @@
       transition: border-color 0.2s ease;
     }
     .gif-item:hover {
-      border-color: #4a90e2;
+      border-color: var(--btn-bg);
+    }
+    .footer {
+      flex-shrink: 0;
+      text-align: center;
+      margin-top: auto;
+      padding-top: 10px;
     }
     .status-msg {
       font-size: 12px;
-      color: #666;
-      text-align: center;
-      margin-top: 10px;
+      color: var(--status-color);
+      transition: color 0.3s ease;
+    }
+    .version-number {
+      font-size: 10px;
+      color: var(--version-color);
+      margin-top: 4px;
+      transition: color 0.3s ease;
     }
   </style>
 </head>
@@ -77,10 +124,12 @@
   </div>
 
   <div class="gif-grid" id="gif-results">
-    <!-- GIFs will be injected here dynamically -->
-  </div>
+    </div>
 
-  <div id="status" class="status-msg">Initializing...</div>
+  <div class="footer">
+    <div id="status" class="status-msg">Initializing...</div>
+    <div class="version-number">v1.0.0</div>
+  </div>
 
   <script>
     // 1. Immediately extract the API key from the query parameters (?key=XXXX)
@@ -95,19 +144,15 @@
     }
 
     // 3. Fallback/Modern Front Integration Pattern
-    // Instead of exclusively relying on the 'config' event, we use a robust lifecycle catch.
     try {
       if (typeof Front !== 'undefined') {
-        // Fallback option A: Listen via legacy or standard layout hooks
         Front.on('config', (context) => {
           updateStatus("Ready to search GIFs!");
         });
 
-        // Fallback option B: Actively poll the sidebar context layout to break any silent thread lock
         Front.getSidebarContext().then(() => {
           updateStatus("Ready to search GIFs!");
         }).catch(() => {
-          // If no message context is open yet, the SDK is still active and working
           updateStatus("Ready. Open a conversation to insert images.");
         });
       } else {
