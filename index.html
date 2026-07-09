@@ -2,17 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>GIF Picker v1.0.4</title>
+<title>GIF Picker v1.0.5</title>
 <script type="text/javascript" src="https://dl.frontapp.com/libs/plugin-sdk-1.8.1.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, sans-serif; background: #fff; color: #222; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #222; }
+/* Dark Mode Support */
 @media (prefers-color-scheme: dark) {
   body { background: #1e1e1e; color: #f0f0f0; }
   .tab { border-color: #555; color: #bbb; }
   .tab.active { background: #2d3e50; color: #8ab4f8; border-color: #8ab4f8; }
   .search-row input { background: #2d2d2d; border-color: #444; color: #fff; }
   .search-row button { background: #333; border-color: #555; color: #ddd; }
+  .gif-item { background: #2d2d2d; }
 }
 #app { padding: 12px; }
 .tab-row { display: flex; gap: 5px; margin-bottom: 10px; }
@@ -32,75 +34,5 @@ body { font-family: -apple-system, sans-serif; background: #fff; color: #222; }
 </head>
 <body>
 <div id="app">
-  <div id="contextStatus" class="context-status">Initializing...</div>
-  <div class="tab-row">
-    <button class="tab active" data-tab="gifs">GIFs</button>
-    <button class="tab" data-tab="stickers">Stickers</button>
-    <button class="tab" data-tab="memes">Memes</button>
-  </div>
-  <div class="search-row">
-    <input id="query" type="text" placeholder="Search KLIPY" />
-    <button onclick="doSearch()">Search</button>
-  </div>
-  <div id="grid" class="gif-grid"></div>
-  <div class="version">v1.0.4</div>
-</div>
-
-<script>
-const API_KEY = 'YXxLGyFs86hGcanamfKx7dFwR4WKuE2YrBQUNQGsqTmi36v4cKZR5BlHgjbo7TZz';
-let currentTab = 'gifs';
-let isReady = false;
-
-const statusEl = document.getElementById('contextStatus');
-
-if (typeof Front !== 'undefined') {
-  Front.contextUpdates.subscribe(function(context) {
-    isReady = true;
-    statusEl.textContent = 'Ready: Tap a GIF to insert';
-    statusEl.className = 'context-status ready';
-  });
-} else {
-  statusEl.textContent = 'Error: Front SDK missing';
-  statusEl.className = 'context-status error';
-}
-
-async function doSearch() {
-  const q = document.getElementById('query').value.trim();
-  const url = `https://api.klipy.com/api/v1/${API_KEY}/${currentTab}/search?q=${encodeURIComponent(q)}&per_page=24&page=1`;
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-    renderItems(data);
-  } catch(e) { statusEl.textContent = 'Search failed'; statusEl.className = 'context-status error'; }
-}
-
-function renderItems(data) {
-  const grid = document.getElementById('grid');
-  grid.innerHTML = '';
-  const items = (data && data.data && data.data.data) ? data.data.data : [];
-  
-  items.forEach(item => {
-    const thumb = item.file?.sm?.gif?.url || '';
-    const full = item.file?.md?.gif?.url || '';
-    const div = document.createElement('div');
-    div.className = 'gif-item';
-    div.innerHTML = `<img src="${thumb}" />`;
-    div.addEventListener('click', function() {
-      if (isReady) {
-        try {
-          Front.insertHTML(`<img src="${full}" alt="GIF" style="max-width:100%;" />`);
-        } catch (e) {
-          statusEl.textContent = 'Insert failed: Open a reply box';
-          statusEl.className = 'context-status error';
-        }
-      } else {
-        statusEl.textContent = 'Not connected to Front';
-        statusEl.className = 'context-status error';
-      }
-    });
-    grid.appendChild(div);
-  });
-}
-</script>
-</body>
-</html>
+  <div id="contextStatus" class="context
+    
