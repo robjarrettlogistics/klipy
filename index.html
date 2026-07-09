@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <title>Klipy GIF Search - Front Sidebar</title>
-  <script src="https://dl.frontapp.com/libs/frontjs.development.js"></script>
+  
+  <script src="https://dl.frontapp.com/libs/plugin-sdk-1.8.1.min.js"></script>
+  
   <style>
     /* Default Light Theme Variables */
     :root {
@@ -132,28 +134,30 @@
   </div>
 
   <script>
-    // 1. Immediately extract the API key from the query parameters (?key=XXXX)
+    // 1. Extract the API key securely from the URL parameter
     const urlParams = new URLSearchParams(window.location.search);
     const klipyApiKey = urlParams.get('key');
 
-    // 2. Defensive check for the API key string
     if (!klipyApiKey) {
-      updateStatus("Error: '?key=' parameter missing from Front Sidebar URL setup.");
+      updateStatus("Error: '?key=' parameter missing from Front Sidebar URL.");
     } else {
-      updateStatus("Key verified. Waiting for Front initialization...");
+      updateStatus("Connecting to Front SDK...");
     }
 
-    // 3. Fallback/Modern Front Integration Pattern
+    // 2. Modern Front Integration Pattern
+    let currentFrontContext = null;
+
     try {
       if (typeof Front !== 'undefined') {
-        Front.on('config', (context) => {
-          updateStatus("Ready to search GIFs!");
-        });
-
-        Front.getSidebarContext().then(() => {
-          updateStatus("Ready to search GIFs!");
-        }).catch(() => {
-          updateStatus("Ready. Open a conversation to insert images.");
+        // Front's modern v1.x SDK uses contextUpdates.subscribe instead of 'config'
+        Front.contextUpdates.subscribe(context => {
+          currentFrontContext = context;
+          
+          if (context.type === 'noConversation') {
+            updateStatus("Ready. Open a conversation to insert GIFs.");
+          } else {
+            updateStatus("Ready to search GIFs!");
+          }
         });
       } else {
         updateStatus("Critical Error: Front SDK object not found.");
@@ -209,34 +213,4 @@
         });
 
       } catch (error) {
-        console.error('Error fetching from Klipy:', error);
-        grid.innerHTML = '<div style="grid-column: span 2; color:red; text-align:center; padding:20px;">Error loading GIFs.</div>';
-      }
-    }
-
-    // Insert Image into Compose or Comment area
-    function insertGifIntoFront(url) {
-      const htmlToInsert = `<img src="${url}" alt="GIF" style="max-width: 100%; height: auto;" />`;
-
-      Front.getSidebarContext().then((context) => {
-        if (context.hasDraft) {
-          context.insertHtml(htmlToInsert);
-          updateStatus("Inserted into email draft!");
-        } else {
-          Front.comment({
-            html: htmlToInsert
-          });
-          updateStatus("Inserted into comment box!");
-        }
-      }).catch((err) => {
-        console.error("SDK Error:", err);
-        updateStatus("Error: Please select a conversation thread first.");
-      });
-    }
-
-    function updateStatus(msg) {
-      document.getElementById('status').innerText = msg;
-    }
-  </script>
-</body>
-</html>
+        
