@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>GIF Picker</title>
+<title>GIF Picker v1.0.3</title>
 <script type="text/javascript" src="https://dl.frontapp.com/libs/plugin-sdk-1.8.1.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, sans-serif; background: #fff; color: #222; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #222; }
 #app { padding: 12px; }
 .tab-row { display: flex; gap: 5px; margin-bottom: 10px; }
 .tab { flex: 1; padding: 5px 0; border-radius: 6px; border: 1px solid #ddd; background: transparent; cursor: pointer; font-size: 12px; color: #666; }
@@ -16,13 +16,14 @@ body { font-family: -apple-system, sans-serif; background: #fff; color: #222; }
 .search-row button { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 12px; }
 .gif-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 5px; }
 .gif-item { border-radius: 6px; overflow: hidden; background: #f0f0f0; aspect-ratio: 1; cursor: pointer; }
-.gif-item img { width: 100%; height: 100%; object-fit: cover; }
-.context-status { font-size: 11px; padding: 4px 8px; border-radius: 4px; margin-bottom: 8px; text-align: center; background: #e6f4ea; color: #1e8e3e; }
+.gif-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.context-status { font-size: 11px; padding: 4px 8px; border-radius: 4px; margin-bottom: 8px; text-align: center; background: #fef3e2; color: #b06000; }
+.context-status.ready { background: #e6f4ea; color: #1e8e3e; }
 </style>
 </head>
 <body>
 <div id="app">
-  <div id="contextStatus" class="context-status">Initializing Front SDK...</div>
+  <div id="contextStatus" class="context-status">Waiting for Front...</div>
   <div class="tab-row">
     <button class="tab active" data-tab="gifs">GIFs</button>
     <button class="tab" data-tab="stickers">Stickers</button>
@@ -38,47 +39,51 @@ body { font-family: -apple-system, sans-serif; background: #fff; color: #222; }
 <script>
 const API_KEY = 'YXxLGyFs86hGcanamfKx7dFwR4WKuE2YrBQUNQGsqTmi36v4cKZR5BlHgjbo7TZz';
 let currentTab = 'gifs';
-let currentQuery = '';
+let isReady = false;
 
-// MODERN SDK INITIALIZATION
+// 1. Initialize Front SDK
 if (typeof Front !== 'undefined') {
   Front.contextUpdates.subscribe(function(context) {
-    document.getElementById('contextStatus').textContent = 'Ready to insert GIFs';
+    isReady = true;
+    document.getElementById('contextStatus').textContent = 'Ready: Click a GIF to insert';
+    document.getElementById('contextStatus').className = 'context-status ready';
   });
 }
 
-// Logic preserved from your working code
-async function fetchItems(url) {
-  try {
-    var res = await fetch(url);
-    return await res.json();
-  } catch(e) { return null; }
-}
-
+// 2. Search Logic
 async function doSearch() {
-  currentQuery = document.getElementById('query').value.trim();
-  var data = await fetchItems('https://api.klipy.com/api/v1/' + API_KEY + '/' + currentTab + '/search?q=' + encodeURIComponent(currentQuery) + '&per_page=24&page=1');
+  const query = document.getElementById('query').value.trim();
+  const url = `https://api.klipy.com/api/v1/${API_KEY}/${currentTab}/search?q=${encodeURIComponent(query)}&per_page=24&page=1`;
+  
+  const res = await fetch(url);
+  const data = await res.json();
   renderItems(data);
 }
 
+// 3. Render and Insert Logic
 function renderItems(data) {
-  var grid = document.getElementById('grid');
+  const grid = document.getElementById('grid');
   grid.innerHTML = '';
-  var items = (data && data.data && data.data.data) ? data.data.data : [];
+  const items = (data && data.data && data.data.data) ? data.data.data : [];
   
-  items.forEach(function(item) {
-    var file = item.file || {};
-    var thumb = (file.sm?.gif?.url) || '';
-    var full = (file.md?.gif?.url) || '';
+  items.forEach(item => {
+    const thumb = item.file?.sm?.gif?.url || '';
+    const full = item.file?.md?.gif?.url || '';
     
-    var div = document.createElement('div');
+    const div = document.createElement('div');
     div.className = 'gif-item';
-    div.innerHTML = `<img src="${thumb}" />`;
+    div.innerHTML = `<img src="${thumb}" alt="GIF" />`;
     
-    // THE MODERN INSERT METHOD
     div.addEventListener('click', function() {
-      if (typeof Front !== 'undefined') {
-        Front.insertHTML(`<img src="${full}" />`);
+      if (isReady && typeof Front !== 'undefined') {
+        try {
+          Front.insertHTML(`<img src="${full}" alt="GIF" style="max-width:100%;" />`);
+        } catch (e) {
+          console.error("Insertion failed:", e);
+          alert("Make sure you are clicked into an email or comment box.");
+        }
+      } else {
+        alert("Front is still connecting. Please wait.");
       }
     });
     grid.appendChild(div);
