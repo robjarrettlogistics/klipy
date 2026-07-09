@@ -3,12 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <title>Klipy GIF Search - Front Sidebar</title>
-  
-  <!-- UPDATED: Modern Front Plugin SDK Script (v1.x) -->
+  <!-- Official Front Plugin SDK v1.x -->
   <script src="https://dl.frontapp.com/libs/plugin-sdk-1.8.1.min.js"></script>
-  
   <style>
-    /* Default Light Theme Variables */
     :root {
       --bg-color: #ffffff;
       --text-color: #333333;
@@ -19,8 +16,6 @@
       --status-color: #666666;
       --version-color: #aaaaaa;
     }
-
-    /* Automatic Dark Theme based on System Settings */
     @media (prefers-color-scheme: dark) {
       :root {
         --bg-color: #1e1e1e;
@@ -33,215 +28,71 @@
         --version-color: #666666;
       }
     }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      margin: 0;
-      padding: 10px;
-      background-color: var(--bg-color);
-      color: var(--text-color);
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      box-sizing: border-box;
-      transition: background-color 0.3s ease, color 0.3s ease;
-    }
-    .search-container {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 12px;
-      flex-shrink: 0;
-    }
-    input[type="text"] {
-      flex: 1;
-      padding: 8px 12px;
-      background-color: var(--input-bg);
-      border: 1px solid var(--input-border);
-      color: var(--text-color);
-      border-radius: 4px;
-      font-size: 14px;
-      transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-    }
-    input[type="text"]:focus {
-      outline: none;
-      border-color: var(--btn-bg);
-    }
-    button {
-      background-color: var(--btn-bg);
-      color: #ffffff;
-      border: none;
-      padding: 8px 14px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 14px;
-      transition: background-color 0.2s ease;
-    }
-    button:hover {
-      background-color: var(--btn-hover);
-    }
-    .gif-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-      overflow-y: auto;
-      flex-grow: 1;
-      padding-bottom: 10px;
-    }
-    .gif-item {
-      width: 100%;
-      height: 120px;
-      object-fit: cover;
-      border-radius: 4px;
-      cursor: pointer;
-      border: 2px solid transparent;
-      transition: border-color 0.2s ease;
-    }
-    .gif-item:hover {
-      border-color: var(--btn-bg);
-    }
-    .footer {
-      flex-shrink: 0;
-      text-align: center;
-      margin-top: auto;
-      padding-top: 10px;
-    }
-    .status-msg {
-      font-size: 12px;
-      color: var(--status-color);
-      transition: color 0.3s ease;
-    }
-    .version-number {
-      font-size: 10px;
-      color: var(--version-color);
-      margin-top: 4px;
-      transition: color 0.3s ease;
-    }
+    body { font-family: sans-serif; margin: 0; padding: 10px; background-color: var(--bg-color); color: var(--text-color); height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
+    .search-container { display: flex; gap: 6px; margin-bottom: 12px; }
+    input { flex: 1; padding: 8px; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-color); border-radius: 4px; }
+    button { background: var(--btn-bg); color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; }
+    .gif-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; overflow-y: auto; flex-grow: 1; }
+    .gif-item { width: 100%; height: 120px; object-fit: cover; border-radius: 4px; cursor: pointer; }
+    .footer { text-align: center; margin-top: auto; padding-top: 10px; font-size: 12px; }
   </style>
 </head>
 <body>
-
   <div class="search-container">
     <input type="text" id="search-input" placeholder="Search Klipy GIFs..." />
     <button id="search-btn">Search</button>
   </div>
-
-  <div class="gif-grid" id="gif-results">
-    <!-- GIFs will be injected here dynamically -->
-  </div>
-
+  <div class="gif-grid" id="gif-results"></div>
   <div class="footer">
-    <div id="status" class="status-msg">Waiting for Front...</div>
-    <div class="version-number">v1.0.2</div>
+    <div id="status">Waiting for Front...</div>
+    <div style="font-size: 10px; color: var(--version-color);">v1.0.1</div>
   </div>
 
   <script>
-    // 1. Extract the API key securely from the URL parameter
     const urlParams = new URLSearchParams(window.location.search);
     const klipyApiKey = urlParams.get('key');
+    let frontReady = false;
 
-    if (!klipyApiKey) {
-      updateStatus("Error: '?key=' parameter missing from Front Sidebar URL.");
-    } else {
-      updateStatus("Connecting to Front SDK...");
+    // Initialize Front SDK
+    if (typeof Front !== 'undefined') {
+      Front.contextUpdates.subscribe(context => {
+        frontReady = true;
+        updateStatus("Ready to search GIFs!");
+      });
     }
 
-    // 2. Modern Front Integration Pattern
-    let currentFrontContext = null;
-
-    try {
-      if (typeof Front !== 'undefined') {
-        // Front's modern v1.x SDK uses contextUpdates.subscribe
-        Front.contextUpdates.subscribe(context => {
-          currentFrontContext = context;
-          
-          if (context.type === 'noConversation') {
-            updateStatus("Ready. Open a conversation to insert GIFs.");
-          } else {
-            updateStatus("Ready to search GIFs!");
-          }
-        });
-      } else {
-        updateStatus("Critical Error: Front SDK object not found.");
-      }
-    } catch (e) {
-      console.error("SDK Initialization failed:", e);
-      updateStatus("Initialization error. Check console logs.");
-    }
-
-    // Handle Search Input / Button Actions
     document.getElementById('search-btn').addEventListener('click', performSearch);
-    document.getElementById('search-input').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') performSearch();
-    });
 
     async function performSearch() {
-      if (!klipyApiKey) {
-        updateStatus("Search blocked: Key query parameter missing.");
-        return;
-      }
-
       const query = document.getElementById('search-input').value.trim();
-      if (!query) return;
+      if (!query || !klipyApiKey) return;
 
       const grid = document.getElementById('gif-results');
-      grid.innerHTML = '<div style="grid-column: span 2; text-align:center; padding:20px;">Searching...</div>';
+      grid.innerHTML = '<div>Searching...</div>';
 
       try {
-        const url = `https://api.klipy.com/api/v1/${klipyApiKey}/gifs/search?q=${encodeURIComponent(query)}&per_page=20`;
-        const response = await fetch(url);
+        // Standard endpoint structure
+        const response = await fetch(`https://api.klipy.com/api/v1/${klipyApiKey}/gifs/search?q=${encodeURIComponent(query)}&per_page=20`);
         const data = await response.json();
-
-        grid.innerHTML = ''; 
-
+        grid.innerHTML = '';
+        
         const gifs = data.data || data.results || [];
-
-        if (gifs.length === 0) {
-          grid.innerHTML = '<div style="grid-column: span 2; text-align:center; padding:20px;">No GIFs found.</div>';
-          return;
-        }
-
         gifs.forEach(gif => {
-          const gifUrl = gif.files?.original?.url || gif.src || gif.url;
-          
-          if (gifUrl) {
+          const url = gif.files?.original?.url || gif.src || gif.url;
+          if (url) {
             const img = document.createElement('img');
-            img.src = gifUrl;
+            img.src = url;
             img.className = 'gif-item';
-            img.alt = gif.title || 'Klipy GIF';
-            img.addEventListener('click', () => insertGifIntoFront(gifUrl));
+            img.onclick = () => { if(frontReady) Front.insertHTML(`<img src="${url}" />`); };
             grid.appendChild(img);
           }
         });
-
-      } catch (error) {
-        console.error('Error fetching from Klipy:', error);
-        grid.innerHTML = '<div style="grid-column: span 2; color:red; text-align:center; padding:20px;">Error loading GIFs.</div>';
+      } catch (e) {
+        grid.innerHTML = '<div style="color:red;">Error loading GIFs. Check console.</div>';
       }
     }
 
-    // Insert Image into Compose or Comment area
-    function insertGifIntoFront(url) {
-      const htmlToInsert = `<img src="${url}" alt="GIF" style="max-width: 100%; height: auto;" />`;
-
-      if (!currentFrontContext) {
-        updateStatus("Error: Front Context not yet loaded.");
-        return;
-      }
-
-      // Dynamically push HTML to the active draft or comment box
-      try {
-         Front.insertHTML(htmlToInsert);
-         updateStatus("Inserted successfully!");
-      } catch (err) {
-         console.error("Insert Error:", err);
-         updateStatus("Could not insert GIF. Make sure a draft or comment box is open.");
-      }
-    }
-
-    function updateStatus(msg) {
-      document.getElementById('status').innerText = msg;
-    }
+    function updateStatus(msg) { document.getElementById('status').innerText = msg; }
   </script>
 </body>
 </html>
