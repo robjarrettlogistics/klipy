@@ -3,96 +3,54 @@
 <head>
   <meta charset="UTF-8">
   <title>Klipy GIF Search - Front Sidebar</title>
-  <!-- Official Front Plugin SDK v1.x -->
   <script src="https://dl.frontapp.com/libs/plugin-sdk-1.8.1.min.js"></script>
   <style>
-    :root {
-      --bg-color: #ffffff;
-      --text-color: #333333;
-      --input-bg: #ffffff;
-      --input-border: #dcdcdc;
-      --btn-bg: #4a90e2;
-      --btn-hover: #357abd;
-      --status-color: #666666;
-      --version-color: #aaaaaa;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg-color: #1e1e1e;
-        --text-color: #f0f0f0;
-        --input-bg: #2d2d2d;
-        --input-border: #444444;
-        --btn-bg: #3a7bc8;
-        --btn-hover: #2a61a0;
-        --status-color: #aaaaaa;
-        --version-color: #666666;
-      }
-    }
-    body { font-family: sans-serif; margin: 0; padding: 10px; background-color: var(--bg-color); color: var(--text-color); height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
-    .search-container { display: flex; gap: 6px; margin-bottom: 12px; }
-    input { flex: 1; padding: 8px; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-color); border-radius: 4px; }
-    button { background: var(--btn-bg); color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; }
-    .gif-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; overflow-y: auto; flex-grow: 1; }
-    .gif-item { width: 100%; height: 120px; object-fit: cover; border-radius: 4px; cursor: pointer; }
-    .footer { text-align: center; margin-top: auto; padding-top: 10px; font-size: 12px; }
+    :root { --bg: #ffffff; --text: #333; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #1e1e1e; --text: #f0f0f0; } }
+    body { font-family: sans-serif; background: var(--bg); color: var(--text); padding: 10px; margin: 0; }
+    .gif-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
+    .gif-item { width: 100%; height: 120px; object-fit: cover; cursor: pointer; border-radius: 4px; }
   </style>
 </head>
 <body>
-  <div class="search-container">
-    <input type="text" id="search-input" placeholder="Search Klipy GIFs..." />
-    <button id="search-btn">Search</button>
-  </div>
+  <input type="text" id="search-input" placeholder="Search GIFs..." style="width: 70%;">
+  <button id="search-btn">Search</button>
   <div class="gif-grid" id="gif-results"></div>
-  <div class="footer">
-    <div id="status">Waiting for Front...</div>
-    <div style="font-size: 10px; color: var(--version-color);">v1.0.1</div>
-  </div>
 
   <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const klipyApiKey = urlParams.get('key');
-    let frontReady = false;
-
-    // Initialize Front SDK
-    if (typeof Front !== 'undefined') {
-      Front.contextUpdates.subscribe(context => {
-        frontReady = true;
-        updateStatus("Ready to search GIFs!");
-      });
-    }
-
-    document.getElementById('search-btn').addEventListener('click', performSearch);
-
-    async function performSearch() {
-      const query = document.getElementById('search-input').value.trim();
-      if (!query || !klipyApiKey) return;
-
+    const klipyApiKey = "YXxLGyFs86hGcanamfKx7dFwR4WKuE2YrBQUNQGsqTmi36v4cKZR5BlHgjbo7TZz";
+    
+    document.getElementById('search-btn').addEventListener('click', async () => {
+      const query = document.getElementById('search-input').value;
       const grid = document.getElementById('gif-results');
-      grid.innerHTML = '<div>Searching...</div>';
+      grid.innerHTML = 'Searching...';
 
       try {
-        // Standard endpoint structure
-        const response = await fetch(`https://api.klipy.com/api/v1/${klipyApiKey}/gifs/search?q=${encodeURIComponent(query)}&per_page=20`);
+        // Added mode: 'cors' to handle the cross-origin request explicitly
+        const response = await fetch(`https://api.klipy.com/api/v1/${klipyApiKey}/gifs/search?q=${encodeURIComponent(query)}&per_page=20`, {
+            method: 'GET',
+            mode: 'cors', 
+            headers: { 'Accept': 'application/json' }
+        });
+
         const data = await response.json();
         grid.innerHTML = '';
         
-        const gifs = data.data || data.results || [];
-        gifs.forEach(gif => {
+        (data.data || data.results || []).forEach(gif => {
           const url = gif.files?.original?.url || gif.src || gif.url;
           if (url) {
             const img = document.createElement('img');
             img.src = url;
             img.className = 'gif-item';
-            img.onclick = () => { if(frontReady) Front.insertHTML(`<img src="${url}" />`); };
+            img.onclick = () => { if(typeof Front !== 'undefined') Front.insertHTML(`<img src="${url}" />`); };
             grid.appendChild(img);
           }
         });
       } catch (e) {
-        grid.innerHTML = '<div style="color:red;">Error loading GIFs. Check console.</div>';
+        grid.innerHTML = 'Error: Check Console.';
+        console.error("Fetch failed:", e);
       }
-    }
-
-    function updateStatus(msg) { document.getElementById('status').innerText = msg; }
+    });
   </script>
 </body>
 </html>
